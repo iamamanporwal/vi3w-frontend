@@ -1,44 +1,100 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Plus, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
-
-// Mock Data
-const recentProjects = [
-  {
-    id: 1,
-    title: "Cyberpunk City Block",
-    type: "Text to 3D",
-    date: "2 hours ago",
-    image: "https://images.unsplash.com/photo-1614728263952-84ea256f9679?q=80&w=300&auto=format&fit=crop"
-  },
-  {
-    id: 2,
-    title: "Modern Apartment Floorplan",
-    type: "Floorplan 3D",
-    date: "1 day ago",
-    image: "https://images.unsplash.com/photo-1580587771525-78b9dba3b91d?q=80&w=300&auto=format&fit=crop"
-  },
-  {
-    id: 3,
-    title: "Vintage Chair",
-    type: "Text to 3D",
-    date: "2 days ago",
-    image: "https://images.unsplash.com/photo-1592078615290-033ee584e267?q=80&w=300&auto=format&fit=crop"
-  },
-  {
-    id: 4,
-    title: "Office Layout Level 2",
-    type: "Floorplan 3D",
-    date: "3 days ago",
-    image: "https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=300&auto=format&fit=crop"
-  }
-];
+import { fetchProjects, Project } from "@/lib/api";
+import { SkeletonCard } from "@/components/SkeletonLoader";
+import { ErrorDisplay } from "@/components/ErrorDisplay";
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadProjects = async () => {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError(null);
+        // Fetch all projects without workflow filter
+        const fetchedProjects = await fetchProjects();
+        // Sort by created_at (newest first) and limit to 8
+        const sortedProjects = fetchedProjects
+          .sort((a, b) => {
+            const aTime = a.created_at?.toMillis?.() || a.created_at?.seconds * 1000 || 0;
+            const bTime = b.created_at?.toMillis?.() || b.created_at?.seconds * 1000 || 0;
+            return bTime - aTime;
+          })
+          .slice(0, 8);
+        setProjects(sortedProjects);
+      } catch (err) {
+        console.error("Error fetching projects:", err);
+        setError("Failed to load projects");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProjects();
+  }, [user]);
+
+  const formatDate = (timestamp: any): string => {
+    if (!timestamp) return "Unknown";
+    
+    let date: Date;
+    if (timestamp.toMillis) {
+      date = timestamp.toDate();
+    } else if (timestamp.seconds) {
+      date = new Date(timestamp.seconds * 1000);
+    } else if (typeof timestamp === 'number') {
+      date = new Date(timestamp);
+    } else {
+      return "Unknown";
+    }
+
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    return date.toLocaleDateString();
+  };
+
+  const getProjectTypeLabel = (workflowType: string): string => {
+    return workflowType === "text-to-3d" ? "Text to 3D" : "Floorplan 3D";
+  };
+
+  const getProjectImage = (project: Project): string => {
+    // Try to get image from output_data or input_data
+    if (project.output_data?.image_url) return project.output_data.image_url;
+    if (project.output_data?.model_url) return project.output_data.model_url;
+    if (project.input_data?.image_url) return project.input_data.image_url;
+    // Default placeholder
+    return "https://images.unsplash.com/photo-1614728263952-84ea256f9679?q=80&w=300&auto=format&fit=crop";
+  };
+
+  const getProjectTitle = (project: Project): string => {
+    if (project.input_data?.prompt) {
+      return project.input_data.prompt.length > 30 
+        ? project.input_data.prompt.substring(0, 30) + "..."
+        : project.input_data.prompt;
+    }
+    return `Project ${project.id}`;
+  };
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -86,28 +142,75 @@ export default function DashboardPage() {
 
       {/* Recent Projects */}
       <h2 className="text-xl font-semibold mb-6">Recent Projects</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {recentProjects.map((project, index) => (
-          <motion.div
-            key={project.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            className="group rounded-xl bg-white/5 border border-white/10 overflow-hidden hover:bg-white/10 transition-all hover:scale-[1.02]"
-          >
-            <div className="aspect-square relative overflow-hidden bg-black/50">
-               <img src={project.image} alt={project.title} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
-               <div className="absolute top-3 left-3 px-2 py-1 rounded bg-black/60 backdrop-blur-md text-[10px] font-medium border border-white/10">
-                 {project.type}
-               </div>
-            </div>
-            <div className="p-4">
-              <h3 className="font-semibold truncate text-white/90">{project.title}</h3>
-              <p className="text-xs text-white/40 mt-1">{project.date}</p>
-            </div>
-          </motion.div>
-        ))}
-      </div>
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <SkeletonCard key={i} />
+          ))}
+        </div>
+      ) : error ? (
+        <ErrorDisplay
+          error={error}
+          onRetry={() => {
+            setError(null);
+            // Reload projects
+            const loadProjects = async () => {
+              if (!user) return;
+              try {
+                setLoading(true);
+                setError(null);
+                const fetchedProjects = await fetchProjects();
+                const sortedProjects = fetchedProjects
+                  .sort((a, b) => {
+                    const aTime = a.created_at?.toMillis?.() || a.created_at?.seconds * 1000 || 0;
+                    const bTime = b.created_at?.toMillis?.() || b.created_at?.seconds * 1000 || 0;
+                    return bTime - aTime;
+                  })
+                  .slice(0, 8);
+                setProjects(sortedProjects);
+              } catch (err) {
+                console.error("Error fetching projects:", err);
+                setError(err instanceof Error ? err.message : "Failed to load projects");
+              } finally {
+                setLoading(false);
+              }
+            };
+            loadProjects();
+          }}
+          retryLabel="Reload projects"
+        />
+      ) : projects.length === 0 ? (
+        <div className="text-center py-12 text-white/60">
+          <p>No projects yet. Create your first project to get started!</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {projects.map((project, index) => (
+            <motion.div
+              key={project.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+              className="group rounded-xl bg-white/5 border border-white/10 overflow-hidden hover:bg-white/10 transition-all hover:scale-[1.02] cursor-pointer"
+            >
+              <div className="aspect-square relative overflow-hidden bg-black/50">
+                <img 
+                  src={getProjectImage(project)} 
+                  alt={getProjectTitle(project)} 
+                  className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" 
+                />
+                <div className="absolute top-3 left-3 px-2 py-1 rounded bg-black/60 backdrop-blur-md text-[10px] font-medium border border-white/10">
+                  {getProjectTypeLabel(project.workflow_type)}
+                </div>
+              </div>
+              <div className="p-4">
+                <h3 className="font-semibold truncate text-white/90">{getProjectTitle(project)}</h3>
+                <p className="text-xs text-white/40 mt-1">{formatDate(project.created_at)}</p>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

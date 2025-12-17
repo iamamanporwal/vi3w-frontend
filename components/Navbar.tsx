@@ -7,13 +7,16 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Menu, X, CreditCard, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user, logout } = useAuth();
   const isLoggedIn = !!user;
-  const [credits, setCredits] = useState(1250); // Mock credits, will come from DB later
+  const [credits, setCredits] = useState<number | null>(null);
+  const [creditsLoading, setCreditsLoading] = useState(true);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -22,6 +25,35 @@ export function Navbar() {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  // Fetch credit balance from Firestore
+  useEffect(() => {
+    const fetchCredits = async () => {
+      if (!user) {
+        setCredits(null);
+        setCreditsLoading(false);
+        return;
+      }
+
+      try {
+        setCreditsLoading(true);
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          setCredits(userData?.credits || 0);
+        } else {
+          setCredits(0);
+        }
+      } catch (error) {
+        console.error("Error fetching credits:", error);
+        setCredits(0);
+      } finally {
+        setCreditsLoading(false);
+      }
+    };
+
+    fetchCredits();
+  }, [user]);
 
   return (
     <>
@@ -66,11 +98,16 @@ export function Navbar() {
               {isLoggedIn ? (
                 <div className="flex items-center gap-4">
                   {/* Credit Counter */}
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:border-purple-500/50 transition-colors group cursor-pointer">
+                  <Link 
+                    href="/dashboard/credits"
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:border-purple-500/50 transition-colors group cursor-pointer"
+                  >
                     <CreditCard className="w-4 h-4 text-purple-400 group-hover:text-purple-300" />
-                    <span className="text-sm font-medium text-white/90">{credits}</span>
+                    <span className="text-sm font-medium text-white/90">
+                      {creditsLoading ? "..." : credits !== null ? credits.toLocaleString() : 0}
+                    </span>
                     <span className="text-xs text-white/50 uppercase tracking-wider">Credits</span>
-                  </div>
+                  </Link>
 
                   {/* User Profile */}
                   <div className="flex items-center gap-3 pl-2 border-l border-white/10">
@@ -149,10 +186,15 @@ export function Navbar() {
                     </div>
                 ) : (
                     <div className="flex flex-col gap-4">
-                         <div className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10">
+                         <Link 
+                           href="/dashboard/credits"
+                           className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+                         >
                             <span className="text-white/60">Credits</span>
-                            <span className="text-xl font-bold text-white">{credits}</span>
-                         </div>
+                            <span className="text-xl font-bold text-white">
+                              {creditsLoading ? "..." : credits !== null ? credits.toLocaleString() : 0}
+                            </span>
+                         </Link>
                          <button onClick={() => logout()} className="w-full py-3 rounded-lg bg-red-500/10 text-red-400 text-center font-medium hover:bg-red-500/20">Logout</button>
                     </div>
                 )}
