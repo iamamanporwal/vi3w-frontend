@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import Script from "next/script";
 import { fetchProject, fetchProjectGenerations, Project, Generation } from "@/lib/api";
 import { ArrowLeft, Download, RefreshCw, Loader2 } from "lucide-react";
 import Link from "next/link";
@@ -145,8 +146,13 @@ export default function ProjectDetailPage() {
                     "/file.svg";
 
   return (
-    <div className="min-h-screen bg-black text-white p-8">
-      <div className="max-w-7xl mx-auto">
+    <>
+      <Script
+        src="https://cdn.jsdelivr.net/npm/@google/model-viewer@3.4.0/dist/model-viewer.min.js"
+        strategy="lazyOnload"
+      />
+      <div className="min-h-screen bg-black text-white p-8">
+        <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <Link
@@ -260,6 +266,7 @@ export default function ProjectDetailPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }
 
