@@ -5,6 +5,7 @@ import { Navbar } from "@/components/Navbar";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { Toaster } from "react-hot-toast";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { LowCreditBannerWrapper } from "@/components/LowCreditBannerWrapper";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -39,6 +40,7 @@ export default function RootLayout({
             <ErrorBoundary>
               {children}
             </ErrorBoundary>
+            <LowCreditBannerWrapper />
             <Toaster
               position="top-right"
               toastOptions={{
